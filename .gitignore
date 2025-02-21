@@ -1,0 +1,24 @@
+# Ansible
+*.retry
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environnements virtuels
+venv/
+env/
+.venv/
+
+# Fichiers de configuration sensibles
+*.vault
+*.secret
+
+# Fichiers de système
+.DS_Store
+Thumbs.db
+
+# Logs
+logs

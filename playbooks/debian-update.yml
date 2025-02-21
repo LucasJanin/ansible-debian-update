@@ -1,0 +1,108 @@
+###########################################################################
+# Filename: DebianUpdate.yaml
+#
+# Purpose: Automated Patching and Updating for Debian-based Systems
+# 
+# Author: Lucas Janin
+# Contact: 
+#   - Mastodon: https://mastodon.social/@lucas3d
+#   - Website:  https://www.lucasjanin.com
+# 
+# Version: 1.0
+# Last Updated: 2025-02-21
+# 
+# Requirements:
+#   - Ansible 2.9+
+#   - Target: Debian/Ubuntu systems
+#
+# Usage: ansible-playbook DebianUpdate.yaml
+###########################################################################
+
+- name: Patching and Updating Linux Systems
+  hosts: 
+      - debian
+      - pihole
+      - vm
+      - lxc:!ansible
+  vars:
+    log_path: "{{ playbook_dir | dirname }}/logs/update/"
+    log_file: "{{ log_path }}/update_{{ ansible_date_time.date | replace('-', '') }}.log"
+    log_keep_day: 10
+  become: true 
+
+  tasks:
+    - name: Update Debian-based Systems
+      apt:
+        update_cache: yes
+        upgrade: dist
+      register: update_output
+
+    - name: Check if a reboot is required.
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+        get_checksum: no
+      register: reboot_required_file
+
+    - name: Reboot the server (if required).
+      ansible.builtin.reboot:
+      when: reboot_required_file.stat.exists == true
+
+    - name: Remove dependencies that are no longer required.
+      ansible.builtin.apt:
+        autoremove: yes
+
+    - name: Ensure log directory exists
+      delegate_to: localhost
+      ansible.builtin.file:
+        path: "{{ log_path }}"  # Répertoire parent
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      run_once: true
+      changed_when: false
+      
+    - name: Ensure log file exists
+      delegate_to: localhost
+      ansible.builtin.file:
+        path: "{{ log_file }}"  # Chemin complet du fichier
+        state: touch
+        mode: '0644'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      run_once: true
+      no_log: true
+      changed_when: false
+      ignore_errors: true
+
+    - name: Append debug output to update.log on control host
+      delegate_to: localhost
+      ansible.builtin.shell: |
+        echo "Host: {{ ansible_hostname }} - Date: $(date)" >> "{{ log_file }}"
+        echo "--------------------------------------------------------------------" >> "{{ log_file }}"
+        echo "{{ update_output.stdout | default('No update output') }}" >> "{{ log_file }}"
+        echo "********************************************************************" >> "{{ log_file }}"
+      changed_when: false
+
+    # New task to manage log file retention
+    - name: Manage log file retention
+      delegate_to: localhost
+      ansible.builtin.find:
+        paths: "{{ log_path }}"
+        patterns: "update_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].log"
+        age: "{{ log_keep_day }}d"
+        recurse: no
+      register: old_log_files
+      run_once: true
+      when: log_keep_day > 0
+
+    - name: Remove old log files
+      delegate_to: localhost
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_log_files.files }}"
+      run_once: true
+      when: 
+        - log_keep_day > 0
+        - old_log_files.files is defined
