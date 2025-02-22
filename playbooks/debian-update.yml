@@ -31,13 +31,13 @@
     log_keep_day: 10
 
   tasks:
-    - name: Ensure system is up to date
+    - name: Ensure the system is up to date
       ansible.builtin.apt:
         update_cache: true
         upgrade: dist
       register: update_output
 
-    - name: Check if a reboot is required.
+    - name: Check if a reboot is required
       ansible.builtin.stat:
         path: /var/run/reboot-required
         get_checksum: no
