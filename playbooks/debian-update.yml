@@ -20,7 +20,7 @@
 
 - name: Patching and Updating Linux Systems
   hosts: 
-      - debian
+      - server
       - pihole
       - vm
       - lxc:!ansible
