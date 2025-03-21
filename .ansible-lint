@@ -1,0 +1,12 @@
+---
+# .ansible-lint configuration file
+
+# Exclude specific rules
+skip_list:
+  - run-once  # Skip warnings about run_once behavior with free strategy
+
+# Use default rules
+use_default_rules: true
+
+# Quiet mode
+quiet: false

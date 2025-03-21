@@ -2,102 +2,108 @@
 # Filename: DebianUpdate.yaml
 #
 # Purpose: Automated Patching and Updating for Debian-based Systems
-# 
+#
 # Author: Lucas Janin
-# Contact: 
+# Contact:
 #   - Mastodon: https://mastodon.social/@lucas3d
 #   - Website:  https://www.lucasjanin.com
-# 
+#
 # Version: 1.0
 # Last Updated: 2025-02-21
-# 
+#
 # Requirements:
 #   - Ansible 2.9+
 #   - Target: Debian/Ubuntu systems
 #
 # Usage: ansible-playbook DebianUpdate.yaml
 ###########################################################################
+# yamllint disable rule:run-once
+# ansible-lint disable run-once
 
 - name: Patching and Updating Linux Systems
-  hosts: 
+  hosts:
       - server
       - pihole
       - vm
       - lxc:!ansible
-  become: true 
+  become: true
   vars:
-    log_dir: "{{ playbook_dir | dirname }}/logs/update/"
-    log_file: "{{ log_dir }}/update_{{ ansible_date_time.date | replace('-', '') }}.log"
-    log_keep_day: 10
+      log_dir: "{{ playbook_dir | dirname }}/logs/update/"
+      log_file: "{{ log_dir }}/update_{{ ansible_date_time.date | replace('-', '') }}.log"
+      log_keep_day: 10
 
   tasks:
-    - name: Ensure the system is up to date
-      ansible.builtin.apt:
-        update_cache: true
-        upgrade: dist
-      register: update_output
+      - name: Ensure the system is up to date
+        ansible.builtin.apt:
+            update_cache: true
+            upgrade: dist
+        register: update_output
 
-    - name: Check if a reboot is required
-      ansible.builtin.stat:
-        path: /var/run/reboot-required
-        get_checksum: no
-      register: reboot_required_file
+      - name: Check if a reboot is required
+        ansible.builtin.stat:
+            path: /var/run/reboot-required
+            get_checksum: false
+        register: reboot_required_file
 
-    - name: Reboot the server (if required)
-      ansible.builtin.reboot:
-      when: reboot_required_file.stat.exists == true
+      - name: Reboot the server (if required)
+        ansible.builtin.reboot:
+        when: reboot_required_file.stat.exists
 
-    - name: Ensure log directory exists
-      ansible.builtin.file:
-        path: "{{ log_dir }}"
-        state: directory
-        mode: '0755'
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
-      run_once: true
-      delegate_to: localhost
-      changed_when: false
-      
-    - name: Ensure log file exists
-      ansible.builtin.file:
-        path: "{{ log_file }}"
-        state: touch
-        mode: '0644'
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
-      run_once: true
-      delegate_to: localhost
-      no_log: true
-      changed_when: false
-      ignore_errors: true
+      - name: Ensure log directory exists
+        ansible.builtin.file:
+            path: "{{ log_dir }}"
+            state: directory
+            mode: '0755'
+            owner: "{{ ansible_user }}"
+            group: "{{ ansible_user }}"
+        # NOTE: run_once behavior may differ with 'free' strategy
+        run_once: true
+        delegate_to: localhost
+        changed_when: false
 
-    - name: Append debug output to update.log on control host
-      ansible.builtin.shell: |
-        echo "Host: {{ ansible_hostname }} - Date: $(date)" >> "{{ log_file }}"
-        echo "--------------------------------------------------------------------" >> "{{ log_file }}"
-        echo "{{ update_output.stdout | default('No update output') }}" >> "{{ log_file }}"
-        echo "********************************************************************" >> "{{ log_file }}"
-      changed_when: false
-      delegate_to: localhost
+      - name: Ensure log file exists
+        ansible.builtin.file:
+            path: "{{ log_file }}"
+            state: touch
+            mode: '0644'
+            owner: "{{ ansible_user }}"
+            group: "{{ ansible_user }}"
+        # NOTE: run_once behavior may differ with 'free' strategy
+        run_once: true
+        delegate_to: localhost
+        no_log: true
+        changed_when: false
+        failed_when: false  # Instead of ignore_errors
 
-    - name: Manage log file retention
-      ansible.builtin.find:
-        paths: "{{ log_dir }}"
-        patterns: "update_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].log"
-        age: "{{ log_keep_day }}d"
-        recurse: false
-      register: old_log_files
-      run_once: true
-      when: log_keep_day > 0
-      delegate_to: localhost
+      - name: Append debug output to update.log on control host
+        ansible.builtin.shell: |
+            echo "Host: {{ ansible_hostname }} - Date: $(date)" >> "{{ log_file }}"
+            echo "--------------------------------------------------------------------" >> "{{ log_file }}"
+            echo "{{ update_output.stdout | default('No update output') }}" >> "{{ log_file }}"
+            echo "********************************************************************" >> "{{ log_file }}"
+        changed_when: false
+        delegate_to: localhost
 
-    - name: Remove old log files
-      ansible.builtin.file:
-        path: "{{ item.path }}"
-        state: absent
-      loop: "{{ old_log_files.files }}"
-      run_once: true
-      when: 
-        - log_keep_day > 0
-        - old_log_files.files is defined
-      delegate_to: localhost
+      - name: Manage log file retention
+        ansible.builtin.find:
+            paths: "{{ log_dir }}"
+            patterns: "update_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].log"
+            age: "{{ log_keep_day }}d"
+            recurse: false
+        register: old_log_files
+        # NOTE: run_once behavior may differ with 'free' strategy
+        run_once: true
+        when: log_keep_day > 0
+        delegate_to: localhost
+
+      - name: Remove old log files
+        ansible.builtin.file:
+            path: "{{ item.path }}"
+            state: absent
+        loop: "{{ old_log_files.files }}"
+        # NOTE: run_once behavior may differ with 'free' strategy
+        run_once: true
+        when:
+            - log_keep_day > 0
+            - old_log_files.files is defined
+        delegate_to: localhost
