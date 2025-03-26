@@ -1,5 +1,5 @@
 ###########################################################################
-# Filename: DebianUpdate.yaml
+# Filename: debian-update.yml
 #
 # Purpose: Automated Patching and Updating for Debian-based Systems
 #
@@ -15,7 +15,7 @@
 #   - Ansible 2.9+
 #   - Target: Debian/Ubuntu systems
 #
-# Usage: ansible-playbook DebianUpdate.yaml
+# Usage: ansible-playbook debian-update.yml
 ###########################################################################
 # yamllint disable rule:run-once
 # ansible-lint disable run-once
@@ -28,8 +28,8 @@
       - lxc:!ansible
   become: true
   vars:
-      log_dir: "{{ playbook_dir | dirname }}/logs/update/"
-      log_file: "{{ log_dir }}/update_{{ ansible_date_time.date | replace('-', '') }}.log"
+      log_dir: "/var/log/ansible/debian-update/"
+      log_file: "{{ log_dir }}/debian-update_{{ ansible_date_time.date | replace('-', '') }}.log"
       log_keep_day: 10
 
   tasks:
